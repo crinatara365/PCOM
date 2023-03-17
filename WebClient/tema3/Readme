@@ -1,0 +1,79 @@
+Tararache Crina-Andreea, grupa 324CB
+
+Pentru inceput, am folosit laboratorul 10 ca schelet pentru tema. Inainte de citirea comenzilor declaram variabilele de
+care avem nevoie: message si response pentru a trimite cererea catre server si a primi raspunsul din partea acestuia, 
+cookies si token pentru a demonstra mai tarziu autentificarea/accesul in biblioteca. In structura while(1) se citesc 
+comenzi de la tastura pana se introduce comanda "exit" in care avem break. Important de mentionat este ca am ales sa
+deschid conexiunea in while pentru a nu ma incurca acel timeout=5.  In continuare, in functie de comanda citita se intra
+pe if-ul corespunzator.
+
+register:
+In momentul in care s-a introdus comanda register, citim de la tastatura un username si o parola, formam cu acestea
+o structura de tip json pe care o punem in form_data cu ajutorul functiei sprintf.  Apelam compute_post_request
+care construieste cererea de tip post cu IP-ul, URL-ul si type content-ul din cerinta, in form_data am pus un singur 
+element (json-ul) si niciun cookie. Pe langa parametrii functiei din laborator, am mai adaugat un parametru header 
+care in acest caz este NULL dar de care o sa avem nevoie mai incolo. Trimitem acest mesaj la server. Retinem in 
+response raspunsul serverului, apoi il dam ca parametru functiei register_response care interpreteaza raspunsul si 
+afiseaza un mesaj corespunzator.  Avem 2 variante: daca in response intalnim stringul "Created" inseamna ca comanda
+a avut succes, altfel nu.  
+Mentiune: In cazul comenzilor register si add_books am observat ca uneori serverul intoarce raspunsul "Too many 
+requests" care ni s-a specificat in enuntul temei sa nu-l tratam. Asadar se poate intampla ca in loc de un mesaj de succes 
+sa para unul de eroare atunci cand raspunsul serverului este "Too many requests".
+
+login:
+Verificam in primul rand daca cookies[0] este NULL pentru a vedea daca s-a efectuat deja un login pentru ca serverul nu 
+trateaza aceasta eroare. Verificam cookie-ul pentru in urma apelului de login, serverul trimite in response un cookie care
+va demonstra autentificarea.  Altfel, citim la fel un username si o parola; parcurgem aceeasi pasi ca la register. In 
+functia compute_post_request se scriu in mesaj header-ele Host, Content-Type, Content_Length. Stiind ca avem mereu
+doar un element in body_data il copiem direct in body_data_buffer cu strcat si il adaugam la final de tot. Inainte de asta
+se verifica daca nu cumva header sau cookies sunt diferite de NULL, caz in care ele trebuie adaugate inainte de mesajul
+in sine asa cum prevede structura cererii de tip post. Intorcandu-ne in client, se apeleaza login_reponse care verifica
+raspunsul serverului: daca gasim 'OK' afisam "Utilizator logat cu succes\n". Daca nu, verificam daca gasim termenul 
+'account" daca da inseamna ca "Nu exista cont cu acest username\n", iar daca avem cod de eroare dar nu se gaseste
+'account' inseamna ca "Credentiale incorecte\n". Daca aceasta functie afiseaza un mesaj de succes, se apeleaza si 
+get_cookie care obtine in cookies[0] , cookie-ul de care avem nevoie mai departe.
+
+enter_library:
+De data aceasta compunem o cerere de tip get pe care o trimitem catre server.  Pentru a executa cu succes comanda
+enter_library, utilizatorul trebuie sa fi facut un apel de login anterior. Acest lucru se demonstreaza prin apelarea functiei
+compute_get_request care primeste variabila cookies. In momentul care serverul primeste cererea get si gaseste 
+printre header-ere "Cookie: ... " o sa realizeze cu succes comanda de acces in biblioteca, altfel afiseaza mesajul ca
+utilzatorul nu este autentificat. Daca comanda are succes, se extrage din raspuns token-ul care demonstreaza accesul.
+
+get_books:
+Pentru orice comanda care necesita acces la biblioteca, trebuie configurat un header  de tipul "Authorization: Bearer 
+token" si introdus in cerere. Daca acesta lipseste serverul intoarce in raspuns un cod de eroare, deci afisam
+"Utilizator fara acces la biblioteca". Daca gasim "OK", afisam pur si simplu tot ce se gaseste in raspuns de la prima 
+paranteza patrata incolo, reprezentand toate cartile adaugate. 
+
+get_book:
+Aici citim de la tastatura si un id de carte ale carei informatii sa le afisam. Pasii sunt exact la fel ca la get_books, avem 
+nevoie de acces la biblioteca. In functia book_response ori gasim, din nou, "OK" si afisam restul raspunsului de la 
+"[" incolo, ori avem 2 cazuri de eroare: fie gasim "decoding" ceea ce inseamna ca serverul nu a gasit token-ul care
+arata accesul deci "Utilizator neautentificat", fie singura varianta ramasa de eroare, si anume "Nu exista carte cu id-ul 
+dat".
+
+add_book:
+In acest caz, citirea se face cu "%[^\n]" pentru a permite utilizatorul sa introduca nume care contin spatii, numere etc,
+asigurandu-ne ca stringurile sunt valide. De asemenea citim page_count-ul ca un string si verificam ulterior daca este 
+numar: verificam daca prima cifra este intre 1 si 9 si dupa verificam daca fiecare caracter pana la final este intre 0 si 9.
+Cum este responsabilitatea clientului sa verificare daca datele sunt valide, in cazul in care nu sunt nu este trimisa nicio
+cerere la server si se afiseaza mesajul "Date invalide\n". Altfel,  se urmeaza aceeasi pasi de pana acum pentru 
+construirea cererii de tip post. Functia book_response intoarce ori "Carte adaugata cu succes" daca gaseste "OK" in 
+response, ori "Utilizator fara acces la biblioteca", altfel.
+
+delete_book:
+Citim, de asemenea, un id pe care il adaugam la url-ul din cerinta pentru a obtine url-ul pe care il dam ca parametru 
+functiei compute_delete_request. Aceasta functie primeste host, url si header si construieste mesajul cu aceste 3 linii:
+"DELETE url HTTP/1.1", "Host: host", "Authorization: Bearer token". La fel ca pana acum cu functia delete_response,
+se trateaza cazurile de eroare si se afiseaza mesaje corespunzatoare.
+
+logout:
+Aici trimitem o cerere de tip get pentru ca avem nevoie sa demonstram doar ca suntem logati, nu ca avem si acces la
+biblioteca. In cazul in functia logout_response intoarce 0, resetam si cookies[0] (pentru ca nu  mai suntem logati si
+trebuie apelat iar login pentru a reinitializa cookies) si token-ul (pentru ca nu vrem ca unu utilizator inca sa aibe acces la 
+biblioteca daca el s-a delogat).
+
+exit:
+Efectuam break, si tot ce mai face programul dupa aceea este sa inchida conexiunea si sa elibereze memoria alocata
+lui message si response.
