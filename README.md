@@ -1,2 +1,2 @@
 # PCOM
-Protocoale de comunicatie, Facultatea de Automatica si Calculatoare, UPB
+Protocoale de comunicatii, Facultatea de Automatica si Calculatoare, UPB
